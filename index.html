@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Client Tracker (Offline Template)</title>
+  <style>
+    /* Simple, clean mobile-first styles */
+    :root{--accent:#2563eb;--muted:#6b7280;--bg:#f8fafc}
+    *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial}
+    body{margin:0;background:var(--bg);color:#0f172a}
+    .container{max-width:960px;margin:18px auto;padding:12px}
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 0}
+    h1{font-size:18px;margin:0}
+    .card{background:white;border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06);}
+
+    /* Login */
+    #loginView{max-width:420px;margin:40px auto}
+    label{display:block;font-size:13px;margin:8px 0 4px}
+    input[type=text],input[type=password],select,textarea{width:100%;padding:10px;border:1px solid #e6eef9;border-radius:8px;font-size:14px}
+    button{background:var(--accent);color:white;padding:10px 12px;border-radius:8px;border:0;font-weight:600}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #dbeafe}
+
+    /* Dashboard */
+    .topbar{display:flex;gap:8px;align-items:center}
+    .search{flex:1}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+    @media(min-width:880px){.grid{grid-template-columns:1fr 320px}}
+
+    .list-item{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #f1f5f9}
+    .list-left{display:flex;gap:12px;align-items:center}
+    .badge{background:#eef2ff;color:#1e3a8a;padding:6px 8px;border-radius:8px;font-size:12px}
+    .muted{color:var(--muted);font-size:13px}
+
+    .small{font-size:12px;color:var(--muted)}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,0.4);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal .panel{width:100%;max-width:520px}
+
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Client Tracker</h1>
+      <div id="userMenu"></div>
+    </header>
+
+    <!-- LOGIN -->
+    <div id="loginView" class="card">
+      <h2 style="margin-bottom:8px">Sign in</h2>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Private app for up to 4 users. Use credentials created by Admin.</div>
+      <label>Username</label>
+      <input id="username" type="text" placeholder="username" />
+      <label>Password</label>
+      <input id="password" type="password" placeholder="password" />
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="loginBtn">Sign in</button>
+        <button id="demoBtn" class="ghost">Use demo user</button>
+      </div>
+      <div id="loginMsg" style="margin-top:10px;color:#dc2626"></div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="appView" style="display:none">
+      <div class="card">
+        <div class="topbar">
+          <input id="search" class="search" placeholder="Search clients by name, tag, or contact" />
+          <button id="addClientBtn">+ New Client</button>
+          <button id="exportBtn" class="ghost">Export</button>
+        </div>
+        <div class="grid">
+          <div>
+            <div id="clientList" style="margin-top:12px"></div>
+          </div>
+          <div>
+            <div class="card" id="rightPanel">
+              <div id="dashboardSummary"></div>
+              <hr style="margin:10px 0">
+              <div id="recentLog"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        Built for private use • Data stored on device (browser storage). APK will use local SQLite.
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL (Add/Edit client & Status) -->
+  <div id="modal" class="modal">
+    <div class="panel card">
+      <h3 id="modalTitle">New Client</h3>
+      <label>Name</label>
+      <input id="m_name" type="text" />
+      <label>Phone / Contact</label>
+      <input id="m_phone" type="text" />
+      <label>Email</label>
+      <input id="m_email" type="text" />
+      <label>Tags (comma separated)</label>
+      <input id="m_tags" type="text" />
+      
+      <label>Status</label>
+      <select id="m_status">
+        <option>Lead</option>
+        <option>In Progress</option>
+        <option>call and spoken</option>
+        <option>call not answered</option>
+        <option>need to call later</option>
+        <option>order conformed</option>
+        <option>Not interested</option>
+        <option>development process</option>
+        <option>client demo</option>
+        <option>comleted</option>
+      </select>
+
+      <label>Notes</label>
+      <textarea id="m_notes" rows="4"></textarea>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="saveClientBtn">Save</button>
+        <button id="cancelClientBtn" class="ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMPLE TEMPLATES -->
+  <template id="clientRowTpl">
+    <div class="list-item">
+      <div class="list-left">
+        <div>
+          <div class="title"></div>
+          <div class="muted small meta"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="badge status"></div>
+        <button class="viewBtn ghost">View</button>
+      </div>
+    </div>
+  </template>
+
+  <script>
+  /* ---------- Simple offline client tracker (single-file) ----------
+
+  - Storage: localStorage under key 'ct_data' (JSON). Easy to read/backup.
+  - Users: 4 fixed users created on first run. Passwords are stored as SHA-256 hex (browser-side) for demo.
+  - Later (APK) replace storage with encrypted SQLite.
+
+  ------------------------------------------------------------------*/
+
+  // Utilities
+  function $(id){return document.getElementById(id)}
+  function el(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild}
+  function nowISO(){return new Date().toISOString()}
+
+  // Simple SHA-256 helper using Web Crypto (returns hex)
+  async function sha256Hex(str){
+    const enc=new TextEncoder();
+    const data=enc.encode(str);
+    const hash=await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // App state
+  const STORAGE_KEY='ct_data_v1';
+  let state={users:[],clients:[],logs:[],currentUser:null};
+
+  // Default users (created only on first run)
+  const DEFAULT_USERS=[
+    {username:'jokani',password:'joo@vectorneu',name:'Jokani N R',role:'admin'},
+    {username:'kiruthika',password:'kiruthika@vector27',name:'Kiruthika S',role:'user'},
+    {username:'keerthanaA',password:'keerthanaA@vector28',name:'Keerthana A',role:'user'},
+    {username:'keerthanaAR',password:'keerthanaAR@vector29',name:'Keerthana A R',role:'user'}
+  ];
+
+  // Default sample clients (optional)
+  const DEFAULT_CLIENTS=[
+    {id:uid(),name:'Asha Tailors',phone:'(91) 98765 43210',email:'asha@example.com',tags:['tailoring','local'],notes:'Interested in bulk order',status:'Lead',created_at:nowISO(),updated_at:nowISO()},
+    {id:uid(),name:'Fashion Academy',phone:'(91) 91234 56789',email:'academy@example.com',tags:['training'],notes:'Trial batch starting next month',status:'In Progress',created_at:nowISO(),updated_at:nowISO()}
+  ];
+
+  // Simple uid
+  function uid(){return 'id_'+Math.random().toString(36).slice(2,9)}
+
+  // Load/save with forced reset if credentials changed
+  function loadState(){
+    // Clear existing data if it's using old credentials
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      try {
+        const existing = JSON.parse(raw);
+        if(existing.users && existing.users.length > 0) {
+          const oldAdmin = existing.users.find(u => u.username === 'jokani');
+          if(oldAdmin && oldAdmin.password_hash !== 'a1b2c3...') { // Simplified check
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+            return;
+          }
+        }
+      } catch(e) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+    
+    if(!raw){
+      // first run: seed users (hash passwords)
+      (async()=>{
+        state.users=[];
+        for(const u of DEFAULT_USERS){
+          const h=await sha256Hex(u.password);
+          state.users.push({username:u.username,password_hash:h,name:u.name,role:u.role});
+        }
+        state.clients=DEFAULT_CLIENTS;
+        state.logs=[];
+        saveState();
+        renderLogin();
+      })();
+    } else {
+      state=JSON.parse(raw);
+      renderLogin();
+    }
+  }
+
+  function saveState(){localStorage.setItem(STORAGE_KEY, JSON.stringify(state));}
+
+  // Auth
+  async function login(username,password){
+    const h=await sha256Hex(password);
+    const u=state.users.find(x=>x.username===username && x.password_hash===h);
+    if(u){
+      state.currentUser={username:u.username,name:u.name,role:u.role};
+      renderApp();
+      return true;
+    } else {
+      $('loginMsg').textContent='Invalid credentials';
+      return false;
+    }
+  }
+
+  // Simple action logger
+  function logAction(user,action,details){
+    state.logs.unshift({id:uid(),user:user,action:action,details:details,timestamp:nowISO()});
+    if(state.logs.length>200) state.logs.pop();
+    saveState();
+  }
+
+  // UI Renders
+  function renderLogin(){
+    $('loginView').style.display='block';
+    $('appView').style.display='none';
+    $('loginMsg').textContent='';
+  }
+
+  function renderApp(){
+    $('loginView').style.display='none';
+    $('appView').style.display='block';
+    $('userMenu').innerHTML=`<div style="font-size:13px;color:var(--muted)">Hi, ${state.currentUser.name} <button id="logoutBtn" class="ghost" style="margin-left:8px">Logout</button></div>`;
+    $('logoutBtn').onclick=()=>{state.currentUser=null;saveState();renderLogin();};
+    renderClientList();
+    renderSummary();
+    renderRecentLog();
+  }
+
+  function renderClientList(){
+    const q=$('search').value.trim().toLowerCase();
+    const list=$('clientList');list.innerHTML='';
+    const tpl=$('clientRowTpl');
+    const filtered=state.clients.filter(c=>{
+      if(!q) return true;
+      return (c.name+(c.tags?c.tags.join(' '):'')+c.phone+c.email+c.notes).toLowerCase().includes(q);
+    });
+    if(filtered.length===0) list.innerHTML='<div class="muted small">No clients yet. Click + New Client to add.</div>';
+    filtered.forEach(c=>{
+      const node=tpl.content.cloneNode(true);
+      node.querySelector('.title').textContent=c.name;
+      node.querySelector('.meta').textContent=`${c.phone || ''} • ${c.email || ''} • ${c.tags?c.tags.join(', '):''}`;
+      node.querySelector('.status').textContent=c.status;
+      node.querySelector('.viewBtn').onclick=()=>viewClient(c.id);
+      list.appendChild(node);
+    });
+  }
+
+  function renderSummary(){
+    const total=state.clients.length;
+    const open=state.clients.filter(x=>x.status!=='Completed').length;
+    const lastUpdate=state.logs[0]?state.logs[0].timestamp:'-';
+    $('dashboardSummary').innerHTML=`<div><strong>Total clients</strong><div class="small">${total}</div></div><div style="margin-top:8px"><strong>Open</strong><div class="small">${open}</div></div><div style="margin-top:8px"><strong>Last activity</strong><div class="small">${lastUpdate}</div></div>`;
+  }
+
+  function renderRecentLog(){
+    const box=$('recentLog');box.innerHTML='<strong>Recent updates</strong>';
+    if(state.logs.length===0){box.innerHTML+='<div class="small muted" style="margin-top:8px">No activity yet.</div>';return}
+    const list=state.logs.slice(0,8).map(l=>`<div style="margin-top:8px"><div style="font-size:13px"><strong>${l.user}</strong> — ${l.action}</div><div class="small muted">${l.details} • ${new Date(l.timestamp).toLocaleString()}</div></div>`).join('');
+    box.innerHTML+=list;
+  }
+
+  // View client details in modal-like simple view (reuse modal for edit)
+  function viewClient(id){
+    const c=state.clients.find(x=>x.id===id);if(!c) return;
+    openModal('Edit Client');
+    $('m_name').value=c.name;$('m_phone').value=c.phone;$('m_email').value=c.email;$('m_tags').value=(c.tags||[]).join(',');$('m_notes').value=c.notes;$('m_status').value=c.status;
+    $('saveClientBtn').onclick=()=>{saveClient(id)};
+    
+    // quick actions
+    const panel=document.createElement('div');panel.style.marginTop='10px';
+    // Build actions: Add status + Delete (delete only for admin)
+    let panelHtml = '<hr><div style="display:flex;gap:8px">';
+    panelHtml += '<button id="addStatusBtn">Add Status Update</button>';
+    if(state.currentUser.role === 'admin'){
+      panelHtml += '<button id="deleteBtn" class="ghost">Delete Client</button>';
+    }
+    panelHtml += '</div>';
+    panel.innerHTML = panelHtml;
+    const parent=document.querySelector('#modal .panel');
+    // remove any old action panel
+    const old=parent.querySelector('.actionPanel');if(old) old.remove();panel.className='actionPanel';parent.appendChild(panel);
+
+    $('addStatusBtn').onclick=()=>{
+      const note=prompt('Status note (e.g. Called, Sent proposal, etc.)');
+      if(!note) return;
+      const prev=c.status; const newStatus=prompt('Set new status (Lead / In Progress / Completed / Follow-up)',c.status) || c.status;
+      c.status=newStatus;c.updated_at=nowISO();saveState();logAction(state.currentUser.name,'Status update',`${c.name}: ${prev} → ${newStatus} — ${note}`);renderClientList();renderRecentLog();renderSummary();closeModal();
+    };
+    if(state.currentUser.role === 'admin'){
+      $('deleteBtn').onclick=()=>{if(confirm('Delete this client?')){state.clients=state.clients.filter(x=>x.id!==id);saveState();logAction(state.currentUser.name,'Deleted client',c.name);renderClientList();renderRecentLog();renderSummary();closeModal();}}
+    }
+  }
+
+  // Add new client (open modal)
+  function openModal(title){$('modal').style.display='flex';$('modalTitle').textContent=title;}
+  function closeModal(){
+    $('modal').style.display='none';
+    // cleanup
+    const panel=document.querySelector('#modal .panel');const old=panel.querySelector('.actionPanel');if(old) old.remove();
+    $('saveClientBtn').onclick=null;
+  }
+
+  function saveClient(editId=null){
+    const name=$('m_name').value.trim(); if(!name){alert('Name required');return}
+    const obj={id:editId||uid(),name:name,phone:$('m_phone').value.trim(),email:$('m_email').value.trim(),tags:$('m_tags').value.split(',').map(s=>s.trim()).filter(Boolean),notes:$('m_notes').value.trim(),status:$('m_status').value,updated_at:nowISO(),created_at:editId?state.clients.find(x=>x.id===editId).created_at:nowISO()}
+    if(editId){state.clients=state.clients.map(c=>c.id===editId?obj:c);logAction(state.currentUser.name,'Edited client',obj.name);} else {state.clients.unshift(obj);logAction(state.currentUser.name,'Added client',obj.name)}
+    saveState();renderClientList();renderRecentLog();renderSummary();closeModal();
+  }
+
+  // Export JSON data
+  function exportData(){
+    const data=JSON.stringify(state, null, 2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='client-tracker-backup.json';a.click();URL.revokeObjectURL(url);
+  }
+
+  // Event wiring
+  window.addEventListener('load',()=>{
+    loadState();
+    $('loginBtn').onclick=async()=>{
+      const u=$('username').value.trim();const p=$('password').value;
+      const ok=await login(u,p);
+      if(ok){$('username').value='';$('password').value='';$('loginMsg').textContent='';}
+    };
+    $('demoBtn').onclick=async()=>{await login('jokani','joo@vectorneu');};
+    $('addClientBtn').onclick=()=>{openModal('New Client');$('m_name').value='';$('m_phone').value='';$('m_email').value='';$('m_tags').value='';$('m_notes').value='';$('saveClientBtn').onclick=()=>saveClient(null);} ;
+    $('cancelClientBtn').onclick=closeModal;
+    $('search').addEventListener('input',()=>renderClientList());
+    $('exportBtn').onclick=exportData;
+  });
+  </script>
+</body>
+</html>
